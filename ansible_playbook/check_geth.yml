@@ -1,0 +1,12 @@
+---
+- hosts: devnet
+  become: false
+  tasks:
+    - name: Check if geth version
+      command: geth version
+      register: file_check_result
+      ignore_errors: yes
+
+    - name: Display result
+      debug:
+        var: file_check_result.stdout

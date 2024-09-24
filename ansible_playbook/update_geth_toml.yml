@@ -1,0 +1,20 @@
+---
+- hosts: devnet
+  become: true
+  vars:
+    BLOCK_HEIGHT: "{{ BLOCK_HEIGHT }}"
+  tasks:
+    - name: Ensure update_geth_toml is executable
+      file:
+        path: /home/ec2-user/update_geth_toml.sh
+        mode: u+x
+
+    - name: Run the update_geth_toml script
+      command: ./update_geth_toml.sh {{ BLOCK_HEIGHT }}
+      args:
+        chdir: /home/ec2-user
+      register: result
+
+    - name: Show script result
+      debug:
+        var: result.stdout 
