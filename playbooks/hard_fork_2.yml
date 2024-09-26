@@ -7,7 +7,7 @@
 # 5. Starts the node-geth and cosmovisor services (in correct order).
 # 6. Verifies the geth version to ensure the upgrade was successful.
 # Usage: 
-#   ansible-playbook geth_upgrade.yml -e "block_number=123456 binary_file=/path/to/local/binary"
+#   time ansible-playbook playbooks/hard_fork_2.yml -l mini-validator4 -e "block_number=88888 binary_file=~/workspace/geth_upgrade/geth_9_3"
 
 ---
 - name: Geth upgrade
@@ -17,7 +17,7 @@
     block_number: ""      # Block number to use
     binary_file: ""       # Local path of the binary to upload
     dest_binary_path: "/usr/local/bin/geth"  # Destination for binary
-    backup_path: "/usr/local/bin/geth.bak"   # Backup path for the original binary
+    # backup_path: "/usr/local/bin/geth_b224fd.bak"   # Backup path for the original binary
 
   tasks:
     # Check if the block number is provided
@@ -50,11 +50,8 @@
         state: stopped
 
     # Backup the existing geth binary
-    - name: Backup existing geth binary
-      command: mv {{ dest_binary_path }} {{ backup_path }}
-      args:
-        removes: "{{ backup_path }}"  # Ensure it doesn't overwrite an existing backup
-      when: ansible_facts['os_family'] == "Linux"
+    - name: Backup existing geth binary with timestamp
+      command: mv {{ dest_binary_path }} {{ dest_binary_path }}_{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.bak
 
     # Check if binary file is provided
     - name: Check if binary file is provided
