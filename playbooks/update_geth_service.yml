@@ -1,23 +1,59 @@
+# Playbook to Update Geth Service with a Specific Block Number
+# This playbook is designed to:
+# 1. Check if a block number is provided.
+# 2. Ensure the Geth service file (node-geth.service) exists.
+# 3. Update the ExecStart line in the service file with the given block number.
+# 4. Reload the systemd daemon to apply changes.
+# 5. Optionally, it can restart the Geth service (currently commented out).
+# Usage: 
+#   ansible-playbook update_geth_service.yml -e "block_number=123456"
+
 ---
 - name: Update Geth Service with Block Number
-  hosts: devnet
+  hosts: all
   become: yes
-  become_user: root
   vars:
-    block_number: "{{ BLOCK_NUMBER }}"
+    block_number: ""
 
   tasks:
-    - name: Ensure the update_geth_service_overri.sh script has execute permissions
-      file:
-        path: /home/ec2-user/update_geth_service_overri.sh
-        mode: '0755'
-        state: file
+    - name: Check if block number is provided
+      fail:
+        msg: "Usage: Provide a block_number to run the playbook."
+      when: block_number == ""
 
-    - name: Run the update_geth_service_overri.sh script with custom BLOCK_NUMBER
-      command: "/home/ec2-user/update_geth_service_overri.sh {{ block_number }}"
-      become: yes
-      register: result
+    - name: Check if node-geth.service file exists
+      stat:
+        path: /etc/systemd/system/node-geth.service
+      register: service_file_check
 
-    - name: Return the result
+    - name: Fail if node-geth.service does not exist
+      fail:
+        msg: "Service file not found: /etc/systemd/system/node-geth.service"
+      when: not service_file_check.stat.exists
+
+    - name: Update ExecStart line in node-geth.service
+      lineinfile:
+        path: /etc/systemd/system/node-geth.service
+        regexp: '^ExecStart='
+        line: "ExecStart=geth --config=/home/ec2-user/geth/config/geth.toml --metrics --metrics.addr 0.0.0.0 --override.nostoi {{ block_number }}"
+        backup: yes
+
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+
+    # - name: Restart Geth Service
+    #   service:
+    #     name: node-geth
+    #     state: restarted
+
+    - name: Display the updated service file
+      command: cat /etc/systemd/system/node-geth.service
+      register: service_file_content
+
+    - name: Print the updated service file content
       debug:
-        var: result.stdout
+        var: service_file_content.stdout
+
+    - name: Notify user of update
+      debug:
+        msg: "Service updated and restarted with BLOCK_NUMBER={{ block_number }}"

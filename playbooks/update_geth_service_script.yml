@@ -1,0 +1,23 @@
+---
+- name: Update Geth Service with Block Number
+  hosts: devnet
+  become: yes
+  become_user: root
+  vars:
+    block_number: "{{ BLOCK_NUMBER }}"
+
+  tasks:
+    - name: Ensure the update_geth_service_overri.sh script has execute permissions
+      file:
+        path: /home/ec2-user/update_geth_service_overri.sh
+        mode: '0755'
+        state: file
+
+    - name: Run the update_geth_service_overri.sh script with custom BLOCK_NUMBER
+      command: "/home/ec2-user/update_geth_service_overri.sh {{ block_number }}"
+      become: yes
+      register: result
+
+    - name: Return the result
+      debug:
+        var: result.stdout
