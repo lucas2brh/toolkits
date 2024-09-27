@@ -1,6 +1,6 @@
 # Playbook for Geth upgrade with specified block number and binary replacement
 # This playbook performs the following actions:
-# 1. Checks if a block number is provided.
+# 1. Checks if a block number & binary are provided.
 # 2. Updates the ExecStart line in the node-geth.service with the provided block number.
 # 3. Stops the cosmovisor and node-geth services (in correct order).
 # 4. Uploads the specified geth binary to the remote node and creates a backup of the old binary.
@@ -25,6 +25,12 @@
       fail:
         msg: "Usage: Provide a block_number to run the playbook."
       when: block_number == ""
+
+    # Check if binary file is provided
+    - name: Check if binary file is provided
+      fail:
+        msg: "Usage: Provide a binary_file to upload."
+      when: binary_file == ""
 
     # Update ExecStart line in node-geth.service
     - name: Update ExecStart line in node-geth.service
@@ -52,12 +58,6 @@
     # Backup the existing geth binary
     - name: Backup existing geth binary with timestamp
       command: mv {{ dest_binary_path }} {{ dest_binary_path }}_{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.bak
-
-    # Check if binary file is provided
-    - name: Check if binary file is provided
-      fail:
-        msg: "Usage: Provide a binary_file to upload."
-      when: binary_file == ""
 
     # Upload binary file to the remote node
     - name: Upload binary file to the remote node
