@@ -1,0 +1,92 @@
+# Playbook for Geth upgrade with specified block number and binary replacement
+# Usage: 
+#   time ansible-playbook playbooks/hard_fork_2.yml -l mini-validator4 -e "block_number=88888 binary_file=~/workspace/geth_upgrade/geth_9_3"
+
+---
+- name: Geth upgrade
+  hosts: all
+  serial: 1
+  become: yes
+  vars:
+    block_number: ""        # Block number to use
+    local_binary_path: "/home/ec2-user/geth_9_3"  # Path where the binary is already prepared on the node
+    dest_binary_path: "/usr/local/bin/geth"      # Destination for the binary
+
+  tasks:
+    # Check if the block number is provided
+    - name: Check if block number is provided
+      fail:
+        msg: "Usage: Provide a block_number to run the playbook."
+      when: block_number == ""
+
+    # Backup the existing geth binary before updating the service file
+    - name: Backup existing geth binary with timestamp
+      command: mv {{ dest_binary_path }} {{ dest_binary_path }}_{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.bak
+      ignore_errors: yes  # Ignore if the file doesn't exist
+
+    # Update ExecStart line in node-geth.service
+    - name: Update ExecStart line in node-geth.service
+      lineinfile:
+        path: /etc/systemd/system/node-geth.service
+        regexp: '^ExecStart='
+        line: "ExecStart=geth --config=/home/ec2-user/geth/config/geth.toml --metrics --metrics.addr 0.0.0.0 --override.nostoi {{ block_number }}"
+        backup: yes
+
+    # Reload systemd daemon
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+
+    # Stop services, replace binary, and start services in sequence with timing
+    - name: Stop cosmovisor and node-geth, replace Geth binary, and start services with timing
+      shell: |
+        # Record the start time
+        start_time=$(date +%s)
+
+        # Stop cosmovisor and node-geth in sequence
+        systemctl stop cosmovisor
+        systemctl stop node-geth
+
+        # Replace the Geth binary from the prepared local path
+        cp {{ local_binary_path }} /usr/local/bin/geth
+
+        # Start node-geth and cosmovisor in sequence
+        systemctl start node-geth
+        systemctl start cosmovisor
+
+        # Record the end time
+        end_time=$(date +%s)
+
+        # Calculate the duration and display it
+        echo "Total time taken: $((end_time - start_time)) seconds"
+      register: service_operations_result
+
+    # Display the result of service operations and time taken
+    - name: Display result of service operations and time taken
+      debug:
+        var: service_operations_result.stdout
+
+    # Display the updated service file
+    - name: Display the updated service file
+      command: cat /etc/systemd/system/node-geth.service
+      register: service_file_content
+
+    # Print the updated service file content
+    - name: Print the updated service file content
+      debug:
+        var: service_file_content.stdout
+
+    # Check if geth version
+    - name: Check if geth version
+      command: geth version
+      register: geth_check_result
+      ignore_errors: yes
+
+    # Display result
+    - name: Display result
+      debug:
+        var: geth_check_result.stdout
+
+    # Notify user of the update and restart
+    - name: Notify user of update
+      debug:
+        msg: "Service updated and restarted with BLOCK_NUMBER={{ block_number }} and geth upgraded"
