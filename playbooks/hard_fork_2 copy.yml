@@ -1,0 +1,115 @@
+# Playbook for Geth upgrade with specified block number and binary replacement
+# This playbook performs the following actions:
+# 1. Checks if a block number & binary are provided.
+# 2. Updates the ExecStart line in the node-geth.service with the provided block number.
+# 3. Stops the cosmovisor and node-geth services (in correct order).
+# 4. Uploads the specified geth binary to the remote node and creates a backup of the old binary.
+# 5. Starts the node-geth and cosmovisor services (in correct order).
+# 6. Verifies the geth version to ensure the upgrade was successful.
+# Usage: 
+#   time ansible-playbook playbooks/hard_fork_2.yml -l mini-validator4 -e "block_number=88888 binary_file=~/workspace/geth_upgrade/geth_9_3"
+
+---
+- name: Geth upgrade
+  hosts: all
+  become: yes
+  vars:
+    block_number: ""      # Block number to use
+    binary_file: ""       # Local path of the binary to upload
+    dest_binary_path: "/usr/local/bin/geth"  # Destination for binary
+    # backup_path: "/usr/local/bin/geth_b224fd.bak"   # Backup path for the original binary
+
+  tasks:
+    # Check if the block number is provided
+    - name: Check if block number is provided
+      fail:
+        msg: "Usage: Provide a block_number to run the playbook."
+      when: block_number == ""
+
+    # Check if binary file is provided
+    - name: Check if binary file is provided
+      fail:
+        msg: "Usage: Provide a binary_file to upload."
+      when: binary_file == ""
+
+    # Update ExecStart line in node-geth.service
+    - name: Update ExecStart line in node-geth.service
+      lineinfile:
+        path: /etc/systemd/system/node-geth.service
+        regexp: '^ExecStart='
+        line: "ExecStart=geth --config=/home/ec2-user/geth/config/geth.toml --metrics --metrics.addr 0.0.0.0 --override.nostoi {{ block_number }}"
+        backup: yes
+
+    # Reload systemd daemon
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+
+    # Stop services in the correct order (cosmovisor first, then node-geth)
+    - name: Stop cosmovisor service
+      service:
+        name: cosmovisor
+        state: stopped
+
+    - name: Stop node-geth service
+      service:
+        name: node-geth
+        state: stopped
+
+    # Backup the existing geth binary
+    - name: Backup existing geth binary with timestamp
+      command: mv {{ dest_binary_path }} {{ dest_binary_path }}_{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.bak
+
+    # Upload binary file to the remote node
+    - name: Upload binary file to the remote node
+      copy:
+        src: "{{ binary_file }}"
+        dest: "{{ dest_binary_path }}"
+        mode: '0755'
+      register: upload_result
+
+    # Display upload result
+    - name: Display upload result
+      debug:
+        var: upload_result
+
+    # Notify about the uploaded file
+    - name: Notify about the uploaded file
+      debug:
+        msg: "Binary file {{ binary_file }} has been uploaded to {{ dest_binary_path }}"
+
+    # Start services in the correct order (node-geth first, then cosmovisor)
+    - name: Start node-geth service
+      service:
+        name: node-geth
+        state: started
+
+    - name: Start cosmovisor service
+      service:
+        name: cosmovisor
+        state: started
+
+    # Display the updated service file
+    - name: Display the updated service file
+      command: cat /etc/systemd/system/node-geth.service
+      register: service_file_content
+
+    # Print the updated service file content
+    - name: Print the updated service file content
+      debug:
+        var: service_file_content.stdout
+
+    # Check if geth version
+    - name: Check if geth version
+      command: geth version
+      register: geth_check_result
+      ignore_errors: yes
+
+    # Display result
+    - name: Display result
+      debug:
+        var: geth_check_result.stdout
+
+    # Notify user of the update and restart
+    - name: Notify user of update
+      debug:
+        msg: "Service updated and restarted with BLOCK_NUMBER={{ block_number }} and geth upgraded"
