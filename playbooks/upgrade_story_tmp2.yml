@@ -1,0 +1,75 @@
+---
+# Playbook for upgrading Cosmovisor by downloading a tar file, extracting it, stopping the service, replacing the binary, and starting it again
+- name: Upgrade Cosmovisor running app to v0.10.1
+  hosts: all
+  become: yes
+  vars:
+    version: "v0.10.1"
+    user_home: "/home/ec2-user"
+    binary_url: ""  # 作为输入参数传递的下载 URL
+    download_dir: "{{ user_home }}/downloaded_story"  # 解压目录
+
+  tasks:
+
+    - name: Create download directory if it doesn't exist
+      file:
+        path: "{{ download_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Download tarball containing the binary
+      get_url:
+        url: "{{ binary_url }}"
+        dest: "{{ download_dir }}/story_v{{ version }}.tar.gz"
+        mode: '0644'
+
+    - name: Extract the tarball
+      unarchive:
+        src: "{{ download_dir }}/story_v{{ version }}.tar.gz"
+        dest: "{{ download_dir }}"
+        remote_src: yes
+
+    # 查找解压后的 story 二进制文件
+    - name: Find extracted story binary
+      find:
+        paths: "{{ download_dir }}"
+        patterns: "story"
+        recurse: yes
+      register: binary_file
+
+    # 停止 cosmovisor 服务，确保服务停止后再替换二进制文件
+    - name: Stop cosmovisor service
+      service:
+        name: cosmovisor
+        state: stopped
+
+    # 确保找到的二进制文件具有执行权限
+    - name: Ensure binary has executable permissions
+      file:
+        path: "{{ binary_file.files[0].path }}"
+        mode: '0755'
+        state: file
+
+    # 替换旧的二进制文件
+    - name: Replace the old running binary with the extracted binary
+      command: cp {{ binary_file.files[0].path }} {{ user_home }}/story/cosmovisor/genesis/bin/story
+      register: replace_result
+
+    # 启动 cosmovisor 服务
+    - name: Start cosmovisor service
+      service:
+        name: cosmovisor
+        state: started
+
+    # 检查 cosmovisor 版本
+    - name: Check cosmovisor version after upgrade
+      shell: |
+        export DAEMON_NAME=story
+        export DAEMON_HOME={{ user_home }}/story
+        cosmovisor version
+      register: cosmovisor_version
+
+    # 显示 cosmovisor 版本
+    - name: Display cosmovisor version after upgrade
+      debug:
+        var: cosmovisor_version.stdout

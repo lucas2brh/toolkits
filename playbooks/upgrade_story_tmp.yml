@@ -1,0 +1,46 @@
+---
+# Playbook for upgrading Cosmovisor by stopping, replacing the binary, and starting it again
+- name: Upgrade Cosmovisor running app to v0.10.1
+  hosts: all
+  become: yes
+  vars:
+    version: "v0.10.1"
+    user_home: "/home/ec2-user"  
+
+  tasks:
+
+    - name: Stop cosmovisor service
+      service:
+        name: cosmovisor
+        state: stopped
+
+
+    - name: Ensure binary has executable permissions
+      file:
+        path: "{{ user_home }}/story_101"
+        mode: '0755'
+        state: file
+
+
+    - name: Replace the old running binary with the pre-uploaded binary
+      command: cp {{ user_home }}/story_101 {{ user_home }}/story/cosmovisor/genesis/bin/story
+      register: replace_result
+
+
+    - name: Start cosmovisor service
+      service:
+        name: cosmovisor
+        state: started
+
+  
+    - name: Check cosmovisor version after upgrade
+      shell: |
+        export DAEMON_NAME=story
+        export DAEMON_HOME={{ user_home }}/story
+        cosmovisor version
+      register: cosmovisor_version
+
+
+    - name: Display cosmovisor version after upgrade
+      debug:
+        var: cosmovisor_version.stdout

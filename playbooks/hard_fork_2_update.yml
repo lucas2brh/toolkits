@@ -1,11 +1,11 @@
 # Playbook for Geth upgrade with specified block number and binary replacement
 # Usage: 
-#   time ansible-playbook playbooks/hard_fork_2.yml -l mini-validator4 -e "block_number=88888 binary_file=~/workspace/geth_upgrade/geth_9_3"
+#   time ansible-playbook playbooks/hard_fork_2_update.yml -e "block_number=1069000" -l mini-validator4
 
 ---
 - name: Geth upgrade
-  hosts: all
-  serial: 1
+  hosts: mininet # for safety
+  # serial: 1
   become: yes
   vars:
     block_number: ""        # Block number to use
