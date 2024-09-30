@@ -9,10 +9,10 @@
 
   tasks:
 
-    - name: Stop cosmovisor service
-      service:
-        name: cosmovisor
-        state: stopped
+    # - name: Stop cosmovisor service
+    #   service:
+    #     name: cosmovisor
+    #     state: stopped
 
 
     - name: Ensure binary has executable permissions
@@ -23,9 +23,13 @@
 
 
     - name: Replace the old running binary with the pre-uploaded binary
-      command: cp {{ user_home }}/story_101 {{ user_home }}/story/cosmovisor/genesis/bin/story
+      command: cp {{ user_home }}/story_101 {{ user_home }}/story/cosmovisor/upgrades/v0.10.0/bin/story
       register: replace_result
 
+    - name: Start geth service
+      service:
+        name: node-geth
+        state: started
 
     - name: Start cosmovisor service
       service:
