@@ -12,9 +12,9 @@ VERSION=$1
 BINARY_PATH=$2
 UPGRADE_HEIGHT=$3
 
-# Environment setup
+# Environment setup - Make sure these are always set to the correct paths
 export DAEMON_NAME=story
-export DAEMON_HOME=$HOME/story
+export DAEMON_HOME=/home/ec2-user/story
 
 # Display cosmovisor version
 cosmovisor version

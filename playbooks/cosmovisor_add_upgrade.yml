@@ -1,0 +1,119 @@
+---
+# ansible-playbook playbooks/cosmovisor_add_upgrade.yml   -e "version=v0.11.0 bin_url=https://story-geth-binaries.s3.us-west-1.amazonaws.com/story-public/story-linux-amd64-0.11.0-aac4bfe.tar.gz   upgrade_height=1325860" -l mini-validator2
+
+# [FIXED],   Error: open /home/ec2-user/story/cosmovisor/upgrades/v0.11.0/upgrade-info.json: permission denied
+# reason:  `become: yes`, run cosmovisor add-upgrade using sudo or executing the command as root user, the files and directories created will belong to root instead of the current user (like ec2-user).
+- name: Upgrade Cosmovisor Task
+  hosts: mininet
+  # become: yes
+  vars:
+    user_home: "/home/ec2-user"
+    version: "" 
+    bin_url: "" 
+    upgrade_height: ""
+  
+  tasks:
+    - name: Check user
+      shell: whoami
+      register: user_check
+
+    - name: Display current user
+      debug:
+        var: user_check.stdout
+
+    - name: Ensure version to upgrade
+      fail:
+        msg: "Usage: Provide the version to run"
+      when: version == ""
+
+    - name: Ensure the specified upgrade block height
+      fail:
+        msg: "Usage: Provide the upgrade_height to run"
+      when: upgrade_height == ""
+
+    - name: Create directory for extracted binary
+      file:
+        path: "{{ user_home }}/{{ version }}"
+        state: directory
+        mode: '0755'
+
+    - name: Download Binary From URL
+      get_url:
+        url: "{{ bin_url }}"
+        dest: "{{ user_home }}/{{ version }}.tar.gz"
+        mode: '0644'
+
+    - name: Extract the downloaded binary
+      unarchive:
+        src: "{{ user_home }}/{{ version }}.tar.gz"
+        dest: "{{ user_home }}/{{ version }}"
+        remote_src: yes
+
+    - name: Remove the downloaded tar.gz file
+      file:
+        path: "{{ user_home }}/{{ version }}.tar.gz"
+        state: absent
+
+    - name: Find the extracted binary file (assuming there is only one file)
+      shell: "find {{ user_home }}/{{ version }} -type f | head -n 1"
+      register: binary_path
+
+    - name: Display the binary path
+      debug:
+        var: binary_path.stdout
+
+    - name: Ensure binary has executable permissions
+      file:
+        path: "{{ binary_path.stdout }}"
+        mode: '0755'
+        state: file
+
+    - name: Check cosmovisor version
+      shell: |
+        cosmovisor version 2>&1
+      register: cosmovisor_version
+      environment:
+        DAEMON_NAME: "story"
+        DAEMON_HOME: "{{ user_home }}/story"
+        NO_COLOR: "1"
+
+    - name: Display cosmovisor version
+      debug:
+        var: cosmovisor_version.stdout_lines
+
+    - name: Send the add upgrade plan
+      shell: |
+        cosmovisor add-upgrade {{ version }} {{ binary_path.stdout }} --force --upgrade-height {{ upgrade_height }}
+      register: plan_result
+      environment:
+        DAEMON_NAME: "story"
+        DAEMON_HOME: "{{ user_home }}/story"
+        NO_COLOR: "1"
+
+    - name: Display the add upgrade result
+      debug:
+        var: plan_result.stdout
+
+    - name: Check if the upgrade binary is ready in upgrades directory
+      shell: ls -l {{ user_home }}/story/cosmovisor/upgrades/{{ version }}/bin/story
+      register: check_bin
+    
+    - name: Display the ready bin
+      debug:
+        var: check_bin.stdout
+
+    - name: Read and display the upgrade-info.json file
+      slurp:
+        src: "{{ user_home }}/story/data/upgrade-info.json"
+      register: upgrade_info_json
+
+    - name: Display the upgrade-info.json contents
+      debug:
+        msg: "{{ upgrade_info_json.content | b64decode }}"
+
+    - name: Remove the extracted binary directory
+      file:
+        path: "{{ user_home }}/{{ version }}"
+        state: absent
+      when: plan_result.rc == 0
+      become: yes

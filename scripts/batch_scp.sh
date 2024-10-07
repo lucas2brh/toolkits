@@ -15,6 +15,10 @@ NETWORK_TYPE=$3
 # SSH key path
 KEY_PATH="~/.ssh/devnet-aws-stg.pem"
 
+# Retry count and delay between retries
+RETRY_COUNT=3
+RETRY_DELAY=5  # in seconds
+
 # List of mininet servers
 MININET_SERVERS=(
   "mini-boot"
@@ -56,14 +60,36 @@ else
   exit 1
 fi
 
-# Loop through the selected list of servers and transfer files
-for SERVER in "${SERVERS[@]}"; do
-  echo "Transferring file to $SERVER..."
-  scp -i $KEY_PATH $FILE_PATH $SERVER:$DEST_PATH
+# Function to perform SCP with retries
+function transfer_file {
+  local server=$1
+  local attempts=0
 
-  if [ $? -eq 0 ]; then
-    echo "File successfully transferred to $SERVER."
-  else
-    echo "Error transferring file to $SERVER."
-  fi
+  while [ $attempts -lt $RETRY_COUNT ]; do
+    echo "Attempting to transfer file to $server (Attempt $((attempts+1))/$RETRY_COUNT)..."
+    scp -i $KEY_PATH $FILE_PATH $server:$DEST_PATH
+
+    if [ $? -eq 0 ]; then
+      echo "File successfully transferred to $server."
+      return 0
+    else
+      echo "Error transferring file to $server. Retrying in $RETRY_DELAY seconds..."
+      sleep $RETRY_DELAY
+    fi
+
+    attempts=$((attempts+1))
+  done
+
+  echo "Failed to transfer file to $server after $RETRY_COUNT attempts."
+  return 1
+}
+
+# Loop through the selected list of servers and transfer files in parallel
+for SERVER in "${SERVERS[@]}"; do
+  transfer_file $SERVER &
 done
+
+# Wait for all background processes to finish
+wait
+
+echo "All transfers completed."
