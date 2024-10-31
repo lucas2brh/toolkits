@@ -4,7 +4,7 @@
 # [FIXED],   Error: open /home/ec2-user/story/cosmovisor/upgrades/v0.11.0/upgrade-info.json: permission denied
 # reason:  `become: yes`, run cosmovisor add-upgrade using sudo or executing the command as root user, the files and directories created will belong to root instead of the current user (like ec2-user).
 - name: Upgrade Cosmovisor Task
-  hosts: mininet
+  hosts: all
   # become: yes
   vars:
     user_home: "/home/ec2-user"
@@ -13,13 +13,13 @@
     upgrade_height: ""
   
   tasks:
-    - name: Check user
-      shell: whoami
-      register: user_check
+    # - name: Check user
+    #   shell: whoami
+    #   register: user_check
 
-    - name: Display current user
-      debug:
-        var: user_check.stdout
+    # - name: Display current user
+    #   debug:
+    #     var: user_check.stdout
 
     - name: Ensure version to upgrade
       fail:
@@ -54,8 +54,8 @@
         path: "{{ user_home }}/{{ version }}.tar.gz"
         state: absent
 
-    - name: Find the extracted binary file (assuming there is only one file)
-      shell: "find {{ user_home }}/{{ version }} -type f | head -n 1"
+    - name: Find the extracted binary file (assuming there is only one file, excluding AppleDouble files)
+      shell: "find {{ user_home }}/{{ version }} -type f ! -name '._*' | head -n 1"
       register: binary_path
 
     - name: Display the binary path
@@ -101,6 +101,14 @@
     - name: Display the ready bin
       debug:
         var: check_bin.stdout
+
+    - name: file the upgrade binary
+      shell: file {{ user_home }}/story/cosmovisor/upgrades/{{ version }}/bin/story
+      register: file_bin
+    
+    - name: Display the ready bin
+      debug:
+        var: file_bin.stdout
 
     - name: Read and display the upgrade-info.json file
       slurp:
