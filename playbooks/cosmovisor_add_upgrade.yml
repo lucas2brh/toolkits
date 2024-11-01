@@ -4,23 +4,15 @@
 # [FIXED],   Error: open /home/ec2-user/story/cosmovisor/upgrades/v0.11.0/upgrade-info.json: permission denied
 # reason:  `become: yes`, run cosmovisor add-upgrade using sudo or executing the command as root user, the files and directories created will belong to root instead of the current user (like ec2-user).
 - name: Upgrade Cosmovisor Task
-  hosts: all
+  hosts: odyssey_devnet
   # become: yes
   vars:
     user_home: "/home/ec2-user"
     version: "" 
     bin_url: "" 
     upgrade_height: ""
-  
+
   tasks:
-    # - name: Check user
-    #   shell: whoami
-    #   register: user_check
-
-    # - name: Display current user
-    #   debug:
-    #     var: user_check.stdout
-
     - name: Ensure version to upgrade
       fail:
         msg: "Usage: Provide the version to run"
@@ -40,33 +32,42 @@
     - name: Download Binary From URL
       get_url:
         url: "{{ bin_url }}"
-        dest: "{{ user_home }}/{{ version }}.tar.gz"
+        dest: "{{ user_home }}/{{ version }}.download"
         mode: '0644'
 
-    - name: Extract the downloaded binary
+    - name: Check if the downloaded file is a tar.gz archive
+      shell: "file {{ user_home }}/{{ version }}.download"
+      register: file_check
+
+    - name: Display file check result
+      debug:
+        var: file_check.stdout
+
+    - name: Extract the downloaded binary if it is a tar.gz
       unarchive:
-        src: "{{ user_home }}/{{ version }}.tar.gz"
+        src: "{{ user_home }}/{{ version }}.download"
         dest: "{{ user_home }}/{{ version }}"
         remote_src: yes
+      when: "'gzip compressed' in file_check.stdout"
 
-    - name: Remove the downloaded tar.gz file
-      file:
-        path: "{{ user_home }}/{{ version }}.tar.gz"
-        state: absent
+    - name: Set binary path directly if file is not a tar.gz
+      set_fact:
+        binary_path: "{{ user_home }}/{{ version }}.download"
+      when: "'gzip compressed' not in file_check.stdout"
 
-    - name: Find the extracted binary file (assuming there is only one file, excluding AppleDouble files)
+    - name: Find the extracted binary file if the download was a tar.gz
       shell: "find {{ user_home }}/{{ version }} -type f ! -name '._*' | head -n 1"
-      register: binary_path
+      register: extracted_binary_path
+      when: "'gzip compressed' in file_check.stdout"
+
+    - name: Set binary_path to extracted binary if tar.gz was extracted
+      set_fact:
+        binary_path: "{{ extracted_binary_path.stdout }}"
+      when: "'gzip compressed' in file_check.stdout"
 
     - name: Display the binary path
       debug:
-        var: binary_path.stdout
-
-    - name: Ensure binary has executable permissions
-      file:
-        path: "{{ binary_path.stdout }}"
-        mode: '0755'
-        state: file
+        var: binary_path
 
     - name: Check cosmovisor version
       shell: |
@@ -83,7 +84,7 @@
 
     - name: Send the add upgrade plan
       shell: |
-        cosmovisor add-upgrade {{ version }} {{ binary_path.stdout }} --force --upgrade-height {{ upgrade_height }}
+        cosmovisor add-upgrade {{ version }} {{ binary_path }} --force --upgrade-height {{ upgrade_height }}
       register: plan_result
       environment:
         DAEMON_NAME: "story"
@@ -102,11 +103,11 @@
       debug:
         var: check_bin.stdout
 
-    - name: file the upgrade binary
+    - name: Verify the upgrade binary
       shell: file {{ user_home }}/story/cosmovisor/upgrades/{{ version }}/bin/story
       register: file_bin
     
-    - name: Display the ready bin
+    - name: Display the upgrade binary info
       debug:
         var: file_bin.stdout
 
@@ -118,6 +119,11 @@
     - name: Display the upgrade-info.json contents
       debug:
         msg: "{{ upgrade_info_json.content | b64decode }}"
+
+    - name: Remove the downloaded file
+      file:
+        path: "{{ user_home }}/{{ version }}.download"
+        state: absent
 
     - name: Remove the extracted binary directory
       file:
