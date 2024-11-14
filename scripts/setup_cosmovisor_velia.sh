@@ -2,7 +2,7 @@
 
 # wget https://github.com/cosmos/cosmos-sdk/releases/download/cosmovisor%2Fv1.6.0/cosmovisor-v1.6.0-linux-amd64.tar.gz && tar -zxvf cosmovisor-v1.6.0-linux-amd64.tar.gz
 
-# sudo chmod +x setup_cosmovisor.sh && ./setup_cosmovisor.sh /usr/local/bin/story
+# sudo chmod +x ssetup_cosmovisor_velia.sh  && ./setup_cosmovisor_velia.sh /usr/local/bin/story
 
 
 export DAEMON_NAME=story
@@ -58,18 +58,18 @@ After=network.target
 
 [Service]
 Type=simple
-User=ec2-user
-Group=ec2-user
-ExecStart=/usr/local/bin/cosmovisor run run --home=/home/ec2-user/.story/story --log-level=info
+User=velia-user
+Group=velia-user
+ExecStart=/usr/local/bin/cosmovisor run run --home=/home/velia-user/.story/story
 Restart=on-failure
 RestartSec=5s
 LimitNOFILE=65536
 Environment="DAEMON_NAME=story"
-Environment="DAEMON_HOME=/home/ec2-user/.story/story"
+Environment="DAEMON_HOME=/home/velia-user/.story/story"
 Environment="DAEMON_ALLOW_DOWNLOAD_BINARIES=false"
 Environment="DAEMON_RESTART_AFTER_UPGRADE=true"
-Environment="DAEMON_DATA_BACKUP_DIR=/home/ec2-user/.story/story/backup"
-WorkingDirectory=/home/ec2-user
+Environment="DAEMON_DATA_BACKUP_DIR=/home/velia-user/.story/story/backup"
+WorkingDirectory=/home/velia-user
 
 [Install]
 WantedBy=multi-user.target

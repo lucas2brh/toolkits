@@ -1,0 +1,78 @@
+---
+- name: Upgrade the latest geth and iliad binaries
+  hosts: yao
+  become: yes
+  tasks:
+    - name: Install zsh
+      apt:
+        name: zsh
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Ensure zsh is the default shell
+      user:
+        name: "{{ ansible_user }}"
+        shell: "/usr/bin/zsh"
+
+    - name: Stop the existing iliad process using systemd
+      shell: sudo systemctl stop node-story
+      ignore_errors: yes
+      
+    - name: Stop the existing geth process using systemd
+      shell: sudo systemctl stop node-geth
+      ignore_errors: yes
+
+    - name: Add devnet validator2 instance to known_hosts
+      shell: ssh-keyscan -H ec2-204-236-149-190.us-west-1.compute.amazonaws.com >> /home/ec2-user/.ssh/known_hosts
+
+    - name: Copy the iliad binary from story devnet validator2
+      shell: scp -i /home/ec2-user/.key/devnet-aws-stg.pem ec2-user@ec2-204-236-149-190.us-west-1.compute.amazonaws.com:/home/ec2-user/story/cosmovisor/genesis/bin/story /usr/local/bin/story
+
+    - name: Copy the geth binary from story devnet validator2
+      shell: scp -i /home/ec2-user/.key/devnet-aws-stg.pem ec2-user@ec2-204-236-149-190.us-west-1.compute.amazonaws.com:/usr/local/bin/geth /usr/local/bin/geth
+
+    - name: git pull iliad
+      become_user: ec2-user
+      ansible.builtin.git:
+        repo: git@github.com:piplabs/story.git
+        dest: /home/ec2-user/story
+        key_file: /home/ec2-user/.ssh/id_ed25519
+        single_branch: yes
+        version: main
+        force: yes
+    
+    - name: git pull geth
+      become_user: ec2-user
+      ansible.builtin.git:
+        repo: git@github.com:piplabs/story-geth.git
+        dest: /home/ec2-user/story-geth
+        key_file: /home/ec2-user/.ssh/id_ed25519
+        single_branch: yes
+        version: main
+        force: yes
+
+    - name: Build iliad
+      become_user: ec2-user
+      shell: cd /home/ec2-user/story/client && /usr/local/go/bin/go build
+
+    - name: Build geth
+      become_user: ec2-user
+      shell: . ~/.zshrc && cd /home/ec2-user/story-geth && make geth
+      args:
+        executable: /usr/bin/zsh
+
+    - name: Copy the iliad binary to /usr/local/bin
+      shell: cp /home/ec2-user/story/client/client /usr/local/bin/story
+
+    - name: Copy the geth binary to /usr/local/bin
+      shell: cp /home/ec2-user/story-geth/build/bin/geth /usr/local/bin/geth
+
+    - name: Delete the geth folder
+      file:
+        path: /home/ec2-user/geth
+        state: absent
+
+    - name: Delete the iliad folder
+      file:
+        path: /home/ec2-user/iliad
+        state: absent

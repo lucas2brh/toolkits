@@ -1,13 +1,13 @@
 ---
-# ansible-playbook playbooks/cosmovisor_add_upgrade.yml -e "version=v0.12.1 bin_url=https://github.com/piplabs/story/releases/download/v0.12.1/story-linux-amd64  upgrade_height=322000" -l mini-validator2
+# ansible-playbook playbooks/cosmovisor_add_upgrade.yml   -e "version=v0.12.1 bin_url=https://github.com/piplabs/story/releases/download/v0.12.1/story-linux-amd64  upgrade_height=322000" -l mini-validator2
 
 # [FIXED],   Error: open /home/ec2-user/story/cosmovisor/upgrades/v0.11.0/upgrade-info.json: permission denied
 # reason:  `become: yes`, run cosmovisor add-upgrade using sudo or executing the command as root user, the files and directories created will belong to root instead of the current user (like ec2-user).
 - name: Upgrade Cosmovisor Task
-  hosts: all
+  hosts: odyssey_velia
   # become: yes
   vars:
-    user_home: "/home/ec2-user"
+    user_home: "/home/velia-user"
     version: "" 
     bin_url: "" 
     upgrade_height: ""
@@ -93,7 +93,7 @@
       register: cosmovisor_version
       environment:
         DAEMON_NAME: "story"
-        DAEMON_HOME: "{{ user_home }}/story"
+        DAEMON_HOME: "{{ user_home }}/.story/story"
         NO_COLOR: "1"
 
     - name: Display cosmovisor version
@@ -106,7 +106,7 @@
       register: plan_result
       environment:
         DAEMON_NAME: "story"
-        DAEMON_HOME: "{{ user_home }}/story"
+        DAEMON_HOME: "{{ user_home }}/.story/story"
         NO_COLOR: "1"
 
     - name: Display the add upgrade result
@@ -114,7 +114,7 @@
         var: plan_result.stdout
 
     - name: Check if the upgrade binary is ready in upgrades directory
-      shell: ls -l {{ user_home }}/story/cosmovisor/upgrades/{{ version }}/bin/story
+      shell: ls -l {{ user_home }}/.story/story/cosmovisor/upgrades/{{ version }}/bin/story
       register: check_bin
     
     - name: Display the ready bin
@@ -122,7 +122,7 @@
         var: check_bin.stdout
 
     - name: Verify the upgrade binary
-      shell: file {{ user_home }}/story/cosmovisor/upgrades/{{ version }}/bin/story
+      shell: file {{ user_home }}/.story/story/cosmovisor/upgrades/{{ version }}/bin/story
       register: file_bin
     
     - name: Display the upgrade binary info
@@ -131,7 +131,7 @@
 
     - name: Read and display the upgrade-info.json file
       slurp:
-        src: "{{ user_home }}/story/data/upgrade-info.json"
+        src: "{{ user_home }}/.story/story/data/upgrade-info.json"
       register: upgrade_info_json
 
     - name: Display the upgrade-info.json contents
