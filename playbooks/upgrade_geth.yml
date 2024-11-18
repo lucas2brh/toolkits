@@ -16,6 +16,12 @@
         msg: "Usage: Provide the version to run"
       when: version == ""
 
+    - name: Create directory for extracted binary
+      file:
+        path: "{{ user_home }}/{{ version }}"
+        state: directory
+        mode: '0755'
+
     - name: Verify that the binary URL is reachable
       uri:
         url: "{{ bin_url }}"
@@ -28,40 +34,49 @@
       delay: 5  
       ignore_errors: no
 
-    - name: Create directory for extracted binary
-      file:
-        path: "{{ user_home }}/{{ version }}"
-        state: directory
-        mode: '0755'
-
     - name: Download Binary From URL
       get_url:
         url: "{{ bin_url }}"
-        dest: "{{ user_home }}/{{ version }}.tar.gz"
+        dest: "{{ user_home }}/{{ version }}.download"
         mode: '0644'
 
-    - name: Extract the downloaded binary
+    - name: Check if the downloaded file is a tar.gz archive
+      shell: "file {{ user_home }}/{{ version }}.download"
+      register: file_check
+
+    - name: Display file check result
+      debug:
+        var: file_check.stdout
+
+    - name: Extract the downloaded binary if it is a tar.gz
       unarchive:
-        src: "{{ user_home }}/{{ version }}.tar.gz"
+        src: "{{ user_home }}/{{ version }}.download"
         dest: "{{ user_home }}/{{ version }}"
         remote_src: yes
+      when: "'gzip compressed' in file_check.stdout"
 
-    - name: Remove the downloaded tar.gz file
-      file:
-        path: "{{ user_home }}/{{ version }}.tar.gz"
-        state: absent
+    - name: Set binary path directly if file is not a tar.gz
+      set_fact:
+        binary_path: "{{ user_home }}/{{ version }}.download"
+      when: "'gzip compressed' not in file_check.stdout"
 
-    - name: Find the extracted binary file (assuming there is only one file)
-      shell: "find {{ user_home }}/{{ version }} -type f -name 'geth*' | head -n 1"
-      register: binary_path
+    - name: Find the extracted binary file if the download was a tar.gz
+      shell: "find {{ user_home }}/{{ version }} -type f ! -name '._*' | head -n 1"
+      register: extracted_binary_path
+      when: "'gzip compressed' in file_check.stdout"
+
+    - name: Set binary_path to extracted binary if tar.gz was extracted
+      set_fact:
+        binary_path: "{{ extracted_binary_path.stdout }}"
+      when: "'gzip compressed' in file_check.stdout"
 
     - name: Display the binary path
       debug:
-        var: binary_path.stdout
+        var: binary_path
 
     - name: Ensure binary has executable permissions
       file:
-        path: "{{ binary_path.stdout }}"
+        path: "{{ binary_path }}"
         mode: '0755'
         state: file
 
@@ -76,7 +91,7 @@
         systemctl stop node-geth
 
         # Replace the Geth binary from the prepared local path
-        cp {{ binary_path.stdout }} /usr/local/bin/geth
+        cp {{ binary_path }} /usr/local/bin/geth
 
         # Start node-geth and cosmovisor in sequence
         systemctl start node-geth
@@ -102,6 +117,11 @@
     - name: Display result
       debug:
         var: geth_check_result.stdout
+
+    - name: Remove the downloaded file
+      file:
+        path: "{{ user_home }}/{{ version }}.download"
+        state: absent
 
     - name: Remove the extracted binary directory
       file:
