@@ -4,7 +4,7 @@
 # [FIXED],   Error: open /home/ec2-user/story/cosmovisor/upgrades/v0.11.0/upgrade-info.json: permission denied
 # reason:  `become: yes`, run cosmovisor add-upgrade using sudo or executing the command as root user, the files and directories created will belong to root instead of the current user (like ec2-user).
 - name: Upgrade Cosmovisor Task
-  hosts: odyssey_devnet
+  hosts: mininet
   # become: yes
   vars:
     user_home: "/home/ec2-user"
