@@ -1,9 +1,9 @@
-# ansible-playbook upgrade_geth.yml -e "version=v0.9.4 bin_url=https://story-geth-binaries.s3.us-west-1.amazonaws.com/geth-public/geth-linux-amd64-0.9.4-unstable-03e05c9.tar.gz" -l mini-validator1
+# ansible-playbook playbooks/upgrade_geth.yml -e "version=v0.10.1 bin_url=https://github.com/piplabs/story-geth/releases/download/v0.10.1/geth-linux-amd64"
 # 
 
 ---
 - name: Geth upgrade
-  hosts: mininet
+  hosts: odyssey_devnet
   serial: 1
   vars:
     user_home: "/home/ec2-user"
