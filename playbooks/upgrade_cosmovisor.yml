@@ -1,7 +1,10 @@
+# the playbook for upgrade cosmovisor to v1.7.0
 ---
 - name: Setup and configure Cosmovisor
-  hosts: mininet
+  hosts: odyssey_devnet
   become: yes
+  vars:
+    user_home: "/home/ec2-user"
   tasks:
 
     - name: Uninstall existing Go installation
@@ -100,7 +103,7 @@
           file:
             path: /tmp/go1.21.tar.gz
             state: absent
-            
+
     - name: Check cosmovisor version
       shell: |
         cosmovisor version 2>&1
