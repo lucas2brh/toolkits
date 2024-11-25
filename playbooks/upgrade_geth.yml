@@ -1,12 +1,11 @@
 # ansible-playbook playbooks/upgrade_geth.yml -e "version=v0.10.1 bin_url=https://github.com/piplabs/story-geth/releases/download/v0.10.1/geth-linux-amd64"
-# 
 
 ---
 - name: Geth upgrade
-  hosts: odyssey_devnet
+  hosts: all
   serial: 1
   vars:
-    user_home: "/home/ec2-user"
+    user_home: "/home/ubuntu"
     bin_url: "" 
     version: "" 
 
@@ -87,15 +86,15 @@
         start_time=$(date +%s)
 
         # Stop cosmovisor and node-geth in sequence
-        systemctl stop cosmovisor
-        systemctl stop node-geth
+        sudo systemctl stop cosmovisor
+        sudo systemctl stop node-geth
 
         # Replace the Geth binary from the prepared local path
         cp {{ binary_path }} /usr/local/bin/geth
 
         # Start node-geth and cosmovisor in sequence
-        systemctl start node-geth
-        systemctl start cosmovisor
+        sudo systemctl start node-geth
+        sudo systemctl start cosmovisor
 
         # Record the end time
         end_time=$(date +%s)
@@ -103,7 +102,7 @@
         # Calculate the duration and display it
         echo "Total time taken: $((end_time - start_time)) seconds"
       register: service_operations_result
-      become: yes
+      # become: yes
 
     - name: Display result of service operations and time taken
       debug:

@@ -1,13 +1,10 @@
 ---
-# ansible-playbook playbooks/cosmovisor_add_upgrade.yml   -e "version=v0.12.1 bin_url=https://github.com/piplabs/story/releases/download/v0.12.1/story-linux-amd64  upgrade_height=322000" -l mini-validator2
-
-# [FIXED],   Error: open /home/ec2-user/story/cosmovisor/upgrades/v0.11.0/upgrade-info.json: permission denied
-# reason:  `become: yes`, run cosmovisor add-upgrade using sudo or executing the command as root user, the files and directories created will belong to root instead of the current user (like ec2-user).
 - name: Upgrade Cosmovisor Task
-  hosts: odyssey_velia
+  hosts: odyssey_testnet
   # become: yes
   vars:
-    user_home: "/home/velia-user"
+    # user_home: "/home/ubuntu"
+    user_home: "/home/ec2-user"
     version: "" 
     bin_url: "" 
     upgrade_height: ""
@@ -143,9 +140,9 @@
         path: "{{ user_home }}/{{ version }}.download"
         state: absent
 
-    - name: Remove the extracted binary directory
-      file:
-        path: "{{ user_home }}/{{ version }}"
-        state: absent
-      when: plan_result.rc == 0
-      become: yes
+    # - name: Remove the extracted binary directory
+    #   file:
+    #     path: "{{ user_home }}/{{ version }}"
+    #     state: absent
+    #   when: plan_result.rc == 0
+    #   become: yes

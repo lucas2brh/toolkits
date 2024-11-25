@@ -1,10 +1,7 @@
+# ansible-playbook playbooks/cosmovisor_add_upgrade.yml -e "version=v0.13.0 bin_url=https://github.com/piplabs/story/releases/download/v0.13.0/story-linux-amd64  upgrade_height=858000" -l
 ---
-# ansible-playbook playbooks/cosmovisor_add_upgrade.yml -e "version=v0.13.0.2 bin_url=https://github.com/piplabs/story/releases/download/v0.13.0/story-linux-amd64  upgrade_height=336500"
-
-# [FIXED],   Error: open /home/ec2-user/story/cosmovisor/upgrades/v0.11.0/upgrade-info.json: permission denied
-# reason:  `become: yes`, run cosmovisor add-upgrade using sudo or executing the command as root user, the files and directories created will belong to root instead of the current user (like ec2-user).
 - name: Upgrade Cosmovisor Task
-  hosts: odyssey_devnet
+  hosts: odyssey_testnet
   # become: yes
   vars:
     user_home: "/home/ec2-user"
@@ -149,3 +146,16 @@
         state: absent
       when: plan_result.rc == 0
       become: yes
+
+    # - name: Check cosmovisor version again
+    #   shell: |
+    #     cosmovisor version 2>&1
+    #   register: cosmovisor_version
+    #   environment:
+    #     DAEMON_NAME: "story"
+    #     DAEMON_HOME: "{{ user_home }}/story"
+    #     NO_COLOR: "1"
+
+    # - name: Display cosmovisor version again
+    #   debug:
+    #     var: cosmovisor_version.stdout_lines

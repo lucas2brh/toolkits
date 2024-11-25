@@ -2,7 +2,7 @@
 # It will run the 'geth version' command and display the output for each node.
 # Usage: ansible-playbook geth_version_check.yml
 ---
-- hosts: all
+- hosts: odyssey_velia
   become: false
   tasks:
     - name: Check if geth version
