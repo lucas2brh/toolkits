@@ -1,0 +1,118 @@
+# the playbook for upgrade cosmovisor to v1.7.0
+---
+- name: Setup and configure Cosmovisor
+  hosts: odyssey_devnet
+  become: yes
+  vars:
+    user_home: "/home/ec2-user"
+  tasks:
+
+    - name: Uninstall existing Go installation
+      block:
+        - name: Remove Go binaries
+          file:
+            path: /usr/local/go
+            state: absent
+
+    - name: Remove Go links from PATH
+      lineinfile:
+        path: /etc/profile
+        regexp: '^export PATH=\$PATH:/usr/local/go/bin$'
+        state: absent
+
+    - name: Source /etc/profile to refresh environment
+      shell: source /etc/profile
+
+    - name: Check if Go is installed
+      command: which go
+      register: go_check
+      ignore_errors: yes
+
+    - name: Install Go if not found or version < 1.23
+      when: go_check.rc != 0 or 'go version' not in go_check.stdout or '1.23' not in go_check.stdout
+      block:
+        - name: Remove existing Go installation
+          file:
+            path: /usr/local/go
+            state: absent
+
+        - name: Download Go 1.23.3 tarball
+          get_url:
+            url: https://go.dev/dl/go1.23.3.linux-amd64.tar.gz
+            dest: /tmp/go1.23.tar.gz
+            checksum: sha256:a0afb9744c00648bafb1b90b4aba5bdb86f424f02f9275399ce0c20b93a2c3a8.
+
+        - name: Extract Go 1.23.3 tarball
+          unarchive:
+            src: /tmp/go1.23.tar.gz
+            dest: /usr/local
+            remote_src: yes
+
+        - name: Add Go to PATH in /etc/profile
+          lineinfile:
+            path: /etc/profile
+            line: 'export PATH=$PATH:/usr/local/go/bin'
+            state: present
+
+        - name: Source /etc/profile to update PATH
+          shell: source /etc/profile
+
+    - name: Verify Go version
+      command: /usr/local/go/bin/go version
+      register: go_version_check
+
+    - name: Print Go version
+      debug:
+        msg: "Installed Go version: {{ go_version_check.stdout }}"
+
+    - name: Backup existing cosmovisor if it exists
+      copy:
+        src: /usr/local/bin/cosmovisor
+        dest: /usr/local/bin/cosmovisor.bak
+        remote_src: yes
+      ignore_errors: yes
+
+    - name: Install Cosmovisor
+      shell: |
+        /usr/local/go/bin/go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin"
+      async: 1200
+      poll: 30
+
+    - name: Move Cosmovisor binary to /usr/local/bin
+      shell: |
+        mv $HOME/go/bin/cosmovisor /usr/local/bin/
+
+    - name: Set ownership of Cosmovisor binary
+      file:
+        path: /usr/local/bin/cosmovisor
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Restart Cosmovisor service
+      service:
+        name: cosmovisor
+        state: restarted
+
+    - name: Cleanup temporary files
+      when: go_check.rc != 0
+      block:
+        - name: Remove Go tarball
+          file:
+            path: /tmp/go1.21.tar.gz
+            state: absent
+
+    - name: Check cosmovisor version
+      shell: |
+        cosmovisor version 2>&1
+      register: cosmovisor_version
+      environment:
+        DAEMON_NAME: "story"
+        DAEMON_HOME: "{{ user_home }}/story"
+        NO_COLOR: "1"
+
+    - name: Display cosmovisor version
+      debug:
+        var: cosmovisor_version.stdout_lines

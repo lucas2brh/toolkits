@@ -1,108 +1,64 @@
-# the playbook for upgrade cosmovisor to v1.7.0
 ---
-- name: Setup and configure Cosmovisor
-  hosts: odyssey_devnet
-  become: yes
+- name: Upgrade Cosmovisor
+  hosts: all
   vars:
-    user_home: "/home/ec2-user"
+    daemon_home: "{{ ansible_env.HOME }}/story"
+    tmp_dir: "/tmp"
+    binary_name: "cosmovisor"
+    download_url: "https://l1-test-dev.s3.us-east-1.amazonaws.com/cosmovisor/cosmovisor"
+    service_name: "cosmovisor"
   tasks:
-
-    - name: Uninstall existing Go installation
-      block:
-        - name: Remove Go binaries
-          file:
-            path: /usr/local/go
-            state: absent
-
-    - name: Remove Go links from PATH
-      lineinfile:
-        path: /etc/profile
-        regexp: '^export PATH=\$PATH:/usr/local/go/bin$'
-        state: absent
-
-    - name: Source /etc/profile to refresh environment
-      shell: source /etc/profile
-
-    - name: Check if Go is installed
-      command: which go
-      register: go_check
-      ignore_errors: yes
-
-    - name: Install Go if not found or version < 1.23
-      when: go_check.rc != 0 or 'go version' not in go_check.stdout or '1.23' not in go_check.stdout
-      block:
-        - name: Remove existing Go installation
-          file:
-            path: /usr/local/go
-            state: absent
-
-        - name: Download Go 1.23.3 tarball
-          get_url:
-            url: https://go.dev/dl/go1.23.3.linux-amd64.tar.gz
-            dest: /tmp/go1.23.tar.gz
-            checksum: sha256:a0afb9744c00648bafb1b90b4aba5bdb86f424f02f9275399ce0c20b93a2c3a8.
-
-        - name: Extract Go 1.23.3 tarball
-          unarchive:
-            src: /tmp/go1.23.tar.gz
-            dest: /usr/local
-            remote_src: yes
-
-        - name: Add Go to PATH in /etc/profile
-          lineinfile:
-            path: /etc/profile
-            line: 'export PATH=$PATH:/usr/local/go/bin'
-            state: present
-
-        - name: Source /etc/profile to update PATH
-          shell: source /etc/profile
-
-    - name: Verify Go version
-      command: /usr/local/go/bin/go version
-      register: go_version_check
-
-    - name: Print Go version
-      debug:
-        msg: "Installed Go version: {{ go_version_check.stdout }}"
-
-    - name: Backup existing cosmovisor if it exists
-      copy:
-        src: /usr/local/bin/cosmovisor
-        dest: /usr/local/bin/cosmovisor.bak
-        remote_src: yes
-      ignore_errors: yes
-
-    - name: Install Cosmovisor
+    - name: Check cosmovisor version
       shell: |
-        /usr/local/go/bin/go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest
+        cosmovisor version 2>&1
+      register: cosmovisor_version
       environment:
-        PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin"
-      async: 1200
-      poll: 30
+        DAEMON_NAME: "story"
+        DAEMON_HOME: "{{ daemon_home }}"
+        NO_COLOR: "1"
 
-    - name: Move Cosmovisor binary to /usr/local/bin
-      shell: |
-        mv $HOME/go/bin/cosmovisor /usr/local/bin/
+    - name: Display cosmovisor version
+      debug:
+        var: cosmovisor_version.stdout_lines
 
-    - name: Set ownership of Cosmovisor binary
-      file:
-        path: /usr/local/bin/cosmovisor
-        owner: root
-        group: root
+    - name: Verify the download URL is accessible
+      uri:
+        url: "{{ download_url }}"
+        method: HEAD
+        return_content: no
+      register: url_check
+
+    - name: Fail if the URL is not accessible
+      fail:
+        msg: "The download URL for Cosmovisor v1.7.0 is not accessible."
+      when: url_check.status != 200
+
+    - name: Download Cosmovisor v1.7.0 binary to tmp folder
+      get_url:
+        url: "{{ download_url }}"
+        dest: "{{ tmp_dir }}/{{ binary_name }}"
         mode: '0755'
+
+    - name: Backup the current Cosmovisor binary
+      copy:
+        src: /usr/local/bin/{{ binary_name }}
+        dest: /usr/local/bin/{{ binary_name }}.bak
+        remote_src: true
+      become: true
+
+    - name: Replace the old Cosmovisor binary with the new version
+      copy:
+        src: "{{ tmp_dir }}/{{ binary_name }}"
+        dest: /usr/local/bin/cosmovisor
+        remote_src: true
+        mode: '0755'
+      become: true
 
     - name: Restart Cosmovisor service
       service:
         name: cosmovisor
         state: restarted
-
-    - name: Cleanup temporary files
-      when: go_check.rc != 0
-      block:
-        - name: Remove Go tarball
-          file:
-            path: /tmp/go1.21.tar.gz
-            state: absent
+      become: true
 
     - name: Check cosmovisor version
       shell: |
@@ -110,9 +66,15 @@
       register: cosmovisor_version
       environment:
         DAEMON_NAME: "story"
-        DAEMON_HOME: "{{ user_home }}/story"
+        DAEMON_HOME: "{{ daemon_home }}"
         NO_COLOR: "1"
 
     - name: Display cosmovisor version
       debug:
         var: cosmovisor_version.stdout_lines
+
+    - name: Remove the temporary binary file
+      file:
+        path: "{{ tmp_dir }}/{{ binary_name }}"
+        state: absent
+      become: true

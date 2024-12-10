@@ -11,67 +11,67 @@
     user: ec2-user
     group: ec2-user
   tasks:
-    # - name: Create necessary directories for cosmovisor
-    #   file:
-    #     path: "{{ daemon_home }}/{{ item }}"
-    #     state: directory
-    #     mode: '0755'
-    #   with_items:
-    #     - backup
+    - name: Create necessary directories for cosmovisor
+      file:
+        path: "{{ daemon_home }}/{{ item }}"
+        state: directory
+        mode: '0755'
+      with_items:
+        - backup
 
-    # - name: Check if the cosmovisor binary URL is accessible
-    #   uri:
-    #     url: "{{ cosmovisor_url }}"
-    #     method: HEAD
-    #   register: cosmovisor_url_check
-    #   failed_when: cosmovisor_url_check.status != 200
-    #   changed_when: false
+    - name: Check if the cosmovisor binary URL is accessible
+      uri:
+        url: "{{ cosmovisor_url }}"
+        method: HEAD
+      register: cosmovisor_url_check
+      failed_when: cosmovisor_url_check.status != 200
+      changed_when: false
 
-    # - name: Fail if cosmovisor binary URL is not accessible
-    #   fail:
-    #     msg: "The cosmovisor binary URL is not accessible."
-    #   when: cosmovisor_url_check.status != 200
+    - name: Fail if cosmovisor binary URL is not accessible
+      fail:
+        msg: "The cosmovisor binary URL is not accessible."
+      when: cosmovisor_url_check.status != 200
 
-    # - name: Create a specific temporary directory in ec2-user's home directory
-    #   file:
-    #     path: "/home/ec2-user/cosmovisor_temp"
-    #     state: directory
-    #     mode: '0755'
-    #   register: temp_dir
+    - name: Create a specific temporary directory in ec2-user's home directory
+      file:
+        path: "/home/ec2-user/cosmovisor_temp"
+        state: directory
+        mode: '0755'
+      register: temp_dir
 
-    # - name: Print the temporary directory path
-    #   debug:
-    #     var: temp_dir.path
+    - name: Print the temporary directory path
+      debug:
+        var: temp_dir.path
 
-    # - name: Download cosmovisor binary to temporary directory
-    #   get_url:
-    #     url:  "{{ cosmovisor_url }}"
-    #     dest: "{{ temp_dir.path }}/cosmovisor"
-    #     mode: '0755'
+    - name: Download cosmovisor binary to temporary directory
+      get_url:
+        url:  "{{ cosmovisor_url }}"
+        dest: "{{ temp_dir.path }}/cosmovisor"
+        mode: '0755'
 
-    # - name: Copy cosmovisor binary to /usr/local/bin
-    #   copy:
-    #     src: "{{ temp_dir.path }}/cosmovisor"
-    #     dest: "{{ cosmovisor_binary_path }}"
-    #     remote_src: true
-    #     mode: '0755'
-    #   become: yes
+    - name: Copy cosmovisor binary to /usr/local/bin
+      copy:
+        src: "{{ temp_dir.path }}/cosmovisor"
+        dest: "{{ cosmovisor_binary_path }}"
+        remote_src: true
+        mode: '0755'
+      become: yes
 
-    # - name: Initialize cosmovisor with the provided binary path
-    #   command: "{{ cosmovisor_binary_path }} init {{ binary_path }}"
-    #   environment:
-    #     DAEMON_NAME: "story"
-    #     DAEMON_HOME: "{{ daemon_home }}"
-    #   register: cosmovisor_init
-    #   failed_when: cosmovisor_init.rc != 0
+    - name: Initialize cosmovisor with the provided binary path
+      command: "{{ cosmovisor_binary_path }} init {{ binary_path }}"
+      environment:
+        DAEMON_NAME: "story"
+        DAEMON_HOME: "{{ daemon_home }}"
+      register: cosmovisor_init
+      failed_when: cosmovisor_init.rc != 0
 
-    # - name: Print cosmovisor init stdout
-    #   debug:
-    #     msg: "Cosmovisor init output: {{ cosmovisor_init.stdout }}"
+    - name: Print cosmovisor init stdout
+      debug:
+        msg: "Cosmovisor init output: {{ cosmovisor_init.stdout }}"
 
-    # - name: Print cosmovisor init stderr
-    #   debug:
-    #     msg: "Cosmovisor init error (if any): {{ cosmovisor_init.stderr }}"
+    - name: Print cosmovisor init stderr
+      debug:
+        msg: "Cosmovisor init error (if any): {{ cosmovisor_init.stderr }}"
 
     - name: Create or overwrite cosmovisor systemd service file
       copy:
