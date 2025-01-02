@@ -1,4 +1,4 @@
-# ansible-playbook playbooks/cosmovisor_add_upgrade_odyssey_testnet.yml -e "version=v0.13.0 bin_url=https://github.com/piplabs/story/releases/download/v0.13.0/story-linux-amd64  upgrade_height=814531" -l mynode
+# ansible-playbook playbooks/cosmovisor_add_upgrade_odyssey_testnet.yml -e "version=v0.12.1 bin_url=https://github.com/piplabs/story/releases/download/v0.12.1/story-linux-amd64  upgrade_height=322000" -l mynode
 
 ---
 - name: Upgrade Cosmovisor Task

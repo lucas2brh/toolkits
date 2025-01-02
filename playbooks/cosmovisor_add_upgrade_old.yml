@@ -1,7 +1,8 @@
 # ansible-playbook playbooks/cosmovisor_add_upgrade.yml -e "version=v0.13.0 bin_url=https://github.com/piplabs/story/releases/download/v0.13.0/story-linux-amd64  upgrade_height=858000" -l
 ---
 - name: Upgrade Cosmovisor Task
-  hosts: odyssey_testnet
+  hosts: odyssey_devnet
+  serial: 1 
   # become: yes
   vars:
     user_home: "/home/ec2-user"
@@ -146,6 +147,10 @@
         state: absent
       when: plan_result.rc == 0
       become: yes
+
+    - name: Pause for 10 seconds before upgrading the next host
+      pause:
+        seconds: 5
 
     # - name: Check cosmovisor version again
     #   shell: |

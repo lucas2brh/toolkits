@@ -5,8 +5,8 @@
   hosts: all
   serial: 1
   vars:
-    user_home: "/home/ec2-user"
-    # user_home: "/home/ubuntu"
+    # user_home: "/home/ec2-user"
+    user_home: "/home/ubuntu"
     bin_url: ""
     sha256_url: ""
     version: "" 
@@ -144,6 +144,32 @@
       register: service_operations_result
       # become: yes
 
+
+    ## Stop services, replace binary, and start services in sequence with timing
+    # - name: Stop cosmovisor and node-geth, replace Geth binary, and start services with timing
+    #   shell: |
+    #     # Record the start time
+    #     start_time=$(date +%s)
+
+    #     # Stop cosmovisor and node-geth in sequence
+    #     systemctl stop cosmovisor
+    #     systemctl stop node-geth
+
+    #     # Replace the Geth binary from the prepared local path
+    #     cp {{ binary_path }} /usr/local/bin/geth
+
+    #     # Start node-geth and cosmovisor in sequence
+    #     systemctl start node-geth
+    #     systemctl start cosmovisor
+
+    #     # Record the end time
+    #     end_time=$(date +%s)
+
+    #     # Calculate the duration and display it
+    #     echo "Total time taken: $((end_time - start_time)) seconds"
+    #   register: service_operations_result
+    #   become: yes
+
     - name: Display result of service operations and time taken
       debug:
         var: service_operations_result.stdout
@@ -166,7 +192,7 @@
       file:
         path: "{{ user_home }}/{{ version }}"
         state: absent
-      become: yes
+      # become: yes
 
     - name: Get latest 10 lines of node-geth logs
       shell: journalctl -u node-geth -n 10

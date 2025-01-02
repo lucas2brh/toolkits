@@ -3,6 +3,7 @@
   hosts: all
   # become: true
   vars:
+    # cosmovisor_url: "https://l1-test-dev.s3.us-east-1.amazonaws.com/cosmovisor/cosmovisor"
     cosmovisor_url: "https://l1-test-dev.s3.us-east-1.amazonaws.com/cosmovisor/cosmovisor_v1.6.0"
     daemon_name: story
     daemon_home: "{{ ansible_env.HOME }}/.story/story"
